@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>GBSFinances</title>
+    <meta name="description" content="Finanças pessoais: gastos por categoria, bancos, investimentos e comparação de meses.">
+    <meta name="theme-color" content="#0B111E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="GBSFinances">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            /* mesma cor das barras de cima e de baixo do app: as faixas das
+               áreas seguras do iPhone (relógio e barra de início) não destoam */
+            background: #0F1728;
+            touch-action: none;
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        canvas {
+            position: absolute;
+            top: env(safe-area-inset-top, 0px);
+            left: env(safe-area-inset-left, 0px);
+            right: env(safe-area-inset-right, 0px);
+            bottom: env(safe-area-inset-bottom, 0px);
+            width: calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+            height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+            display: block;
+            outline: none;
+        }
+        #loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #8A96AD;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            font-size: 16px;
+            gap: 14px;
+        }
+        #loading img { width: 72px; height: 72px; border-radius: 16px; }
+        /* Campo nativo para colar o token no celular */
+        #gbsf-token {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            background: rgba(5, 8, 15, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+        #gbsf-token[hidden] { display: none; }
+        #gbsf-token .box {
+            background: #0F1728;
+            border: 1px solid #26334C;
+            border-radius: 16px;
+            padding: 18px;
+            width: 100%;
+            max-width: 440px;
+            box-sizing: border-box;
+            color: #E5E9F0;
+        }
+        #gbsf-token h3 { margin: 0 0 6px; font-size: 19px; }
+        #gbsf-token p { margin: 0 0 12px; color: #8A96AD; font-size: 14px; line-height: 1.4; }
+        #gbsf-token input {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 16px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #26334C;
+            background: #1E2A42;
+            color: #E5E9F0;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            -webkit-user-select: text;
+            user-select: text;
+            outline: none;
+        }
+        #gbsf-token input:focus { border-color: #10B981; }
+        #gbsf-token .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        #gbsf-token button {
+            font-size: 15px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid #26334C;
+            background: #1E2A42;
+            color: #E5E9F0;
+            cursor: pointer;
+        }
+        #gbsf-token button.primary { background: #10B981; border-color: #10B981; color: #fff; font-weight: 600; }
+        #gbsf-token .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+        #gbsf-token-msg { min-height: 18px; margin: 10px 0 0 !important; color: #F59E0B !important; }
+    </style>
+</head>
+<body>
+    <canvas id="the_canvas_id"></canvas>
+    <div id="loading">
+        <img src="icons/icon-192.png" alt="">
+        <p>Abrindo o GBSFinances…</p>
+    </div>
+    <div id="gbsf-token" hidden>
+        <div class="box" role="dialog" aria-labelledby="gbsf-token-title">
+            <h3 id="gbsf-token-title">Token do GitHub</h3>
+            <p>Toque e segure no campo e escolha <b>Colar</b>, ou use o botão abaixo. O token começa com <b>ghp_</b> ou <b>github_pat_</b>.</p>
+            <input id="gbsf-token-input" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Cole o token aqui">
+            <div class="row">
+                <button id="gbsf-paste" type="button">📋 Colar</button>
+                <button id="gbsf-eye" type="button">👁 Mostrar</button>
+            </div>
+            <p id="gbsf-token-msg"></p>
+            <div class="actions">
+                <button id="gbsf-cancel" type="button">Cancelar</button>
+                <button id="gbsf-ok" type="button" class="primary">Conectar</button>
+            </div>
+        </div>
+    </div>
+    <script type="module">
+        import init from "./gbsfinances.js";
+        init().catch((e) => {
+            const l = document.getElementById("loading");
+            if (l) l.innerHTML = "<p>Não foi possível abrir o app. Atualize a página.</p>";
+            console.error(e);
+        });
+    </script>
+    <script>
+        // Campo nativo do token: no celular, o campo desenhado pelo app não
+        // oferece "Colar"; este campo do sistema oferece (toque longo › Colar).
+        (function () {
+            window.gbsfTokenResult = null;
+            window.gbsfTokenOpen = false;
+            const box = document.getElementById("gbsf-token");
+            const input = document.getElementById("gbsf-token-input");
+            const eye = document.getElementById("gbsf-eye");
+            const paste = document.getElementById("gbsf-paste");
+            const ok = document.getElementById("gbsf-ok");
+            const cancel = document.getElementById("gbsf-cancel");
+            const msg = document.getElementById("gbsf-token-msg");
+            // O app (canvas) não pode "roubar" toques, teclas nem o colar deste campo.
+            ["pointerdown", "pointerup", "pointermove", "mousedown", "mouseup", "mousemove", "touchstart", "touchmove",
+             "touchend", "keydown", "keyup", "paste", "copy", "cut", "wheel"].forEach((t) =>
+                box.addEventListener(t, (e) => e.stopPropagation()));
+            function setShow(show) {
+                input.type = show ? "text" : "password";
+                eye.textContent = show ? "🙈 Esconder" : "👁 Mostrar";
+            }
+            function close() {
+                box.hidden = true;
+                window.gbsfTokenOpen = false;
+                input.blur();
+            }
+            window.gbsfOpenTokenDialog = function (initial, show) {
+                input.value = initial || "";
+                msg.textContent = "";
+                setShow(!!show);
+                box.hidden = false;
+                window.gbsfTokenOpen = true;
+                setTimeout(() => input.focus(), 50);
+            };
+            eye.addEventListener("click", () => setShow(input.type === "password"));
+            paste.addEventListener("click", async () => {
+                try {
+                    const t = await navigator.clipboard.readText();
+                    if (t && t.trim()) {
+                        input.value = t.trim();
+                        msg.textContent = "Token colado. Toque em Mostrar para conferir.";
+                    } else {
+                        msg.textContent = "Não há nada copiado. Copie o token no GitHub e tente de novo.";
+                    }
+                } catch (e) {
+                    msg.textContent = "O navegador não deixou colar pelo botão. Toque e segure no campo acima e escolha Colar.";
+                    input.focus();
+                }
+            });
+            ok.addEventListener("click", () => {
+                const t = input.value.replace(/\s+/g, "");
+                if (t.length < 20) {
+                    msg.textContent = "Esse token parece incompleto. Copie o código inteiro.";
+                    return;
+                }
+                window.gbsfTokenResult = t;
+                close();
+            });
+            input.addEventListener("keydown", (e) => { if (e.key === "Enter") ok.click(); });
+            cancel.addEventListener("click", close);
+            if (new URLSearchParams(location.search).has("tokendialog")) {
+                window.gbsfOpenTokenDialog("ghp_exemploDeTokenColado1234567890", true);
+            }
+        })();
+    </script>
+    <script>
+        // Funciona sem internet: o service worker guarda o app no aparelho.
+        if ("serviceWorker" in navigator && location.protocol !== "file:") {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW:", e));
+            });
+        }
+    </script>
+</body>
+</html>
